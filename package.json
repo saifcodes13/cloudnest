@@ -6,7 +6,8 @@
   "scripts": {
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
-    "dev": "concurrently --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "router": "nginx -c /home/saif/cloudnest/ngnix/nginx.conf -g 'daemon off;'",
+    "dev": "concurrently --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run router\"",
     "build:backend": "npm run build --prefix backend",
     "build:frontend": "npm run build --prefix frontend",
     "build": "npm run build:backend && npm run build:frontend"

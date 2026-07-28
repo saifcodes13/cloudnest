@@ -12,6 +12,8 @@ const envSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().default(100),
   JWT_SECRET: z.string().min(8, "JWT_SECRET must be at least 8 characters long"),
   JWT_EXPIRES_IN: z.string().default("7d"),
+  UPLOAD_DIR: z.string().min(1, "UPLOAD_DIR is required"),
+  HOSTED_DIR: z.string().min(1, "HOSTED_DIR is required"),
 });
 
 const result = envSchema.safeParse(process.env);

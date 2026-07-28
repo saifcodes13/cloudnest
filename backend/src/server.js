@@ -24,4 +24,3 @@ process.on("unhandledRejection", (err) => {
   });
 });
 // Nodemon restart anchor
-
