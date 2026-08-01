@@ -1,0 +1,67 @@
+name: Deploy CloudNest
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-vm1:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to VM1
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM1_HOST }}
+          username: ${{ secrets.VM1_USER }}
+          key: ${{ secrets.VM1_SSH_KEY }}
+
+          script: |
+            cd ~/cloudnest
+
+            git pull origin main
+
+            cd backend
+            npm install
+
+            pm2 restart cloudnest-backend || pm2 start src/server.js --name cloudnest-backend
+
+            cd ../frontend
+            npm install
+
+            echo "✅ VM1 Deployment Complete"
+
+  deploy-vm2:
+    needs: deploy-vm1
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to VM2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM2_HOST }}
+          username: ${{ secrets.VM2_USER }}
+          key: ${{ secrets.VM2_SSH_KEY }}
+
+          script: |
+            cd ~/cloudnest
+
+            git pull origin main
+
+            cd backend
+            npm install
+
+            pm2 restart cloudnest-backend || pm2 start src/server.js --name cloudnest-backend
+
+            cd ../frontend
+            npm install
+
+            echo "✅ VM2 Deployment Complete"
+            
