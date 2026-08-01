@@ -10,10 +10,7 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout latest code
-        uses: actions/checkout@v4
-
-      - name: Deploy CloudNest
+      - name: Deploy VM1
         run: |
           cd /home/saif/cloudnest
 
@@ -28,4 +25,25 @@ jobs:
           cd ../frontend
           npm install
 
-          echo "✅ CloudNest deployed successfully!"
+          echo "✅ VM1 deployed"
+
+      - name: Deploy VM2
+        run: |
+          ssh -i /home/saif/.ssh/vm2_deploy saif@192.168.1.32 << 'EOF'
+
+          cd /home/saif/cloudnest
+
+          git fetch origin
+          git reset --hard origin/main
+
+          cd backend
+          npm install
+
+          pm2 restart cloudnest-backend || pm2 start src/server.js --name cloudnest-backend
+
+          cd ../frontend
+          npm install
+
+          echo "✅ VM2 deployed"
+
+          EOF
