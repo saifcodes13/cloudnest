@@ -36,13 +36,57 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-export const uploadMiddleware = multer({
+const multerUpload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 100 * 1024 * 1024, // 100MB limit
   },
 }).single("file");
+
+export const uploadMiddleware = (req, res, next) => {
+  logger.info("========== UPLOAD START ==========");
+  logger.info("1. Upload request received");
+
+  const uploadStart = Date.now();
+
+  multerUpload(req, res, (err) => {
+    logger.info("2. Multer callback executed");
+
+    if (err) {
+      logger.error("❌ Multer Error:", err);
+      return next(err);
+    }
+
+    logger.info("3. Multer completed successfully");
+
+    if (!req.file) {
+      logger.warn("⚠️ No file found in request");
+    } else {
+      logger.info("4. File Details:");
+      logger.info(`   Original Name : ${req.file.originalname}`);
+      logger.info(`   Saved Path    : ${req.file.path}`);
+      logger.info(`   Size          : ${req.file.size} bytes`);
+
+      // Check if file actually exists on disk
+      const exists = fs.existsSync(req.file.path);
+      logger.info(`   Exists on Disk: ${exists}`);
+
+      if (exists) {
+        const stats = fs.statSync(req.file.path);
+        logger.info(`   Disk Size     : ${stats.size} bytes`);
+      }
+    }
+
+    const duration = Date.now() - uploadStart;
+    req.uploadDuration = duration;
+
+    logger.info(`5. Upload completed in ${duration}ms`);
+    logger.info("========== UPLOAD END ==========");
+
+    next();
+  });
+};
 
 // Zod validator for subdomain names
 const websiteNameSchema = z
@@ -56,6 +100,9 @@ const websiteNameSchema = z
  * Handle static website uploads and deployment initialization
  */
 export const uploadSite = asyncHandler(async (req, res, next) => {
+  const uploadDuration = req.uploadDuration || 0;
+  const startProcess = Date.now();
+
   // 1) Verify file exists in request
   if (!req.file) {
     return next(new AppError("Please upload a .zip archive file", 400));
@@ -73,6 +120,9 @@ export const uploadSite = asyncHandler(async (req, res, next) => {
   }
 
   const websiteName = nameValidation.data;
+
+  let dbTime = 0;
+  const dbStart = Date.now();
 
   // 3) Retrieve or register the website project
   let website = await Website.findOne({ name: websiteName });
@@ -103,36 +153,63 @@ export const uploadSite = asyncHandler(async (req, res, next) => {
     version: nextVersion,
   });
 
+  dbTime += Date.now() - dbStart;
+
   // 6) Extract archive files to hosted-sites/
   const targetDir = path.join(env.HOSTED_DIR, website.name, deployment._id.toString());
 
+  logger.info("Extracting ZIP...");
+  const extractStart = Date.now();
   try {
     await extractZip(req.file.path, targetDir);
   } catch (error) {
+    logger.error(`❌ Zip extraction failed: ${error.message}`, error);
+    
+    const dbErrStart = Date.now();
     deployment.status = "failed";
     deployment.errorLog = `Extraction error: ${error.message}`;
     await deployment.save();
+    dbTime += Date.now() - dbErrStart;
+
     return next(new AppError("Zip file extraction failed", 500));
   }
+  const extractDuration = Date.now() - extractStart;
+  logger.info("Extraction completed.");
+
+  logger.info("Creating deployment folder...");
+  const folderStart = Date.now();
+  // folder is created recursive in extractZip/fs.mkdirSync, so this is a path resolution step
+  const folderDuration = Date.now() - folderStart;
 
   // 7) Audit extraction folder (index.html verification)
+  logger.info("Moving files...");
+  const moveStart = Date.now();
   const resolvedPath = resolveHostingPath(targetDir);
+  const moveDuration = Date.now() - moveStart;
 
   if (!resolvedPath) {
     // Purge target directories if index.html is missing
     purgeDirectory(targetDir);
+    
+    const dbErrStart = Date.now();
     deployment.status = "failed";
     deployment.errorLog = "Invalid build: index.html was not found in the root folder";
     await deployment.save();
+    dbTime += Date.now() - dbErrStart;
+
     return next(new AppError("Invalid build: index.html was not found in the root folder", 400));
   }
 
   // 8) Finalize deployment details
+  const dbFinalStart = Date.now();
   deployment.status = "deployed";
   deployment.extractedPath = resolvedPath;
   await deployment.save();
+  dbTime += Date.now() - dbFinalStart;
 
   // Create or update the 'active' symlink pointing to the new deployment folder
+  logger.info("Creating symlink...");
+  const symlinkStart = Date.now();
   const activeSymlinkPath = path.join(env.HOSTED_DIR, website.name, "active");
   try {
     let symlinkExists = false;
@@ -148,16 +225,40 @@ export const uploadSite = asyncHandler(async (req, res, next) => {
     }
     fs.symlinkSync(resolvedPath, activeSymlinkPath);
   } catch (err) {
-    logger.error(`❌ Failed to create active symlink: ${err.message}`);
+    logger.error(`❌ Failed to create active symlink: ${err.message}`, err);
+    
+    const dbErrStart = Date.now();
     deployment.status = "failed";
     deployment.errorLog = `Symlink routing error: ${err.message}`;
     await deployment.save();
+    dbTime += Date.now() - dbErrStart;
+
     return next(new AppError("Routing configuration failed", 500));
   }
+  const symlinkDuration = Date.now() - symlinkStart;
 
+  logger.info("Saving MongoDB...");
+  const dbEndStart = Date.now();
   // Point website to active deployment
   website.activeDeployment = deployment._id;
   await website.save();
+  dbTime += Date.now() - dbEndStart;
+
+  logger.info("Deployment completed.");
+  
+  const processDuration = Date.now() - startProcess;
+  const totalDuration = uploadDuration + processDuration;
+
+  logger.info(
+    `Performance breakdown for ${websiteName}: ` +
+    `upload: ${uploadDuration}ms | ` +
+    `save: ${folderDuration}ms | ` +
+    `extract: ${extractDuration}ms | ` +
+    `move: ${moveDuration}ms | ` +
+    `symlink: ${symlinkDuration}ms | ` +
+    `database: ${dbTime}ms | ` +
+    `total: ${totalDuration}ms`
+  );
 
   return ApiResponse.success(
     res,

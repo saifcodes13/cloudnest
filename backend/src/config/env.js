@@ -14,6 +14,8 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default("7d"),
   UPLOAD_DIR: z.string().min(1, "UPLOAD_DIR is required"),
   HOSTED_DIR: z.string().min(1, "HOSTED_DIR is required"),
+  BASE_DOMAIN: z.string().default("localhost:8082"),
+  PROTOCOL: z.enum(["http", "https"]).default("http"),
 });
 
 const result = envSchema.safeParse(process.env);

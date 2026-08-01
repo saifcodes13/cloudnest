@@ -16,6 +16,10 @@ const server = app.listen(env.PORT, () => {
   logger.info(`🚀 Server running in ${env.NODE_ENV} mode on port ${env.PORT}`);
 });
 
+// Set server timeouts to 15 minutes (900000ms) to support large file uploads
+server.timeout = 900000;
+server.requestTimeout = 900000;
+
 // Handle unhandled promise rejections globally
 process.on("unhandledRejection", (err) => {
   logger.error("❌ UNHANDLED REJECTION! Shutting down gracefully...", err);

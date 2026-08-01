@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import unzipper from "unzipper";
+import AdmZip from "adm-zip";
 import { logger } from "../config/logger.js";
 
 /**
@@ -11,18 +11,16 @@ import { logger } from "../config/logger.js";
  */
 export const extractZip = (zipPath, targetDir) => {
   return new Promise((resolve, reject) => {
-    fs.mkdirSync(targetDir, { recursive: true });
-
-    fs.createReadStream(zipPath)
-      .pipe(unzipper.Extract({ path: targetDir }))
-      .on("close", () => {
-        logger.info(`📦 Successfully extracted zip to: ${targetDir}`);
-        resolve();
-      })
-      .on("error", (err) => {
-        logger.error(`❌ Zip extraction failed: ${err.message}`);
-        reject(err);
-      });
+    try {
+      fs.mkdirSync(targetDir, { recursive: true });
+      const zip = new AdmZip(zipPath);
+      zip.extractAllTo(targetDir, true);
+      logger.info(`📦 Successfully extracted zip to: ${targetDir}`);
+      resolve();
+    } catch (err) {
+      logger.error(`❌ Zip extraction failed: ${err.message}`);
+      reject(err);
+    }
   });
 };
 

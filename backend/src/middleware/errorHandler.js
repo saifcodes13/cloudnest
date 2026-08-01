@@ -3,6 +3,14 @@ import { logger } from "../config/logger.js";
 import ApiResponse from "../utils/apiResponse.js";
 
 export const errorHandler = (err, req, res, _next) => {
+  if (err.name === "MulterError") {
+    err.statusCode = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+    err.isOperational = true;
+    err.message = err.code === "LIMIT_FILE_SIZE"
+      ? "File is too large. Maximum allowed size is 100MB."
+      : `Upload error: ${err.message}`;
+  }
+
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 

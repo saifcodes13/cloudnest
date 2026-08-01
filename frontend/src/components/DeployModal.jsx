@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import websiteService from "../services/websiteService.js";
+import useConfig from "../hooks/useConfig.js";
 import { X, Upload, FileArchive, AlertCircle, Loader2 } from "lucide-react";
 
 // Client-side validation schema
@@ -19,6 +20,9 @@ const deploySchema = z.object({
 });
 
 export const DeployModal = ({ isOpen, onClose, onSuccess }) => {
+  const { data: config } = useConfig();
+  const baseDomain = config?.baseDomain || "localhost:8082";
+
   const [file, setFile] = useState(null);
   const [fileError, setFileError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -57,8 +61,8 @@ export const DeployModal = ({ isOpen, onClose, onSuccess }) => {
       return;
     }
 
-    if (selectedFile.size > 50 * 1024 * 1024) {
-      setFileError("Maximum file size limit is 50MB");
+    if (selectedFile.size > 100 * 1024 * 1024) {
+      setFileError("Maximum file size limit is 100MB");
       setFile(null);
       return;
     }
@@ -162,7 +166,7 @@ export const DeployModal = ({ isOpen, onClose, onSuccess }) => {
                   {...register("name")}
                 />
                 <span className="bg-slate-800 border-l border-[#1e293b] px-4 py-3 text-xs font-semibold text-slate-500 flex items-center select-none">
-                  .localhost:8082
+                  .{baseDomain}
                 </span>
               </div>
               <p className="mt-1.5 text-[10px] text-slate-500">
@@ -207,7 +211,7 @@ export const DeployModal = ({ isOpen, onClose, onSuccess }) => {
                     Drag and drop your project `.zip` here
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    or click to browse local files (max 50MB)
+                    or click to browse local files (max 100MB)
                   </p>
                 </div>
               ) : (

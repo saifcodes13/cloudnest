@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../hooks/useAuth.js";
 import websiteService from "../services/websiteService.js";
+import useConfig from "../hooks/useConfig.js";
 import DeployModal from "../components/DeployModal.jsx";
 import {
   Plus,
@@ -19,6 +20,10 @@ export const Dashboard = () => {
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  const { data: config } = useConfig();
+  const baseDomain = config?.baseDomain || "localhost:8082";
+  const protocol = config?.protocol || "http";
 
   // Load registered websites owned by the user
   const {
@@ -136,7 +141,7 @@ export const Dashboard = () => {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
           {websites.map((site) => {
-            const domainUrl = `http://${site.name}.localhost:8082`;
+            const domainUrl = `${protocol}://${site.name}.${baseDomain}`;
             const isDeployed = site.activeDeployment?.status === "deployed";
 
             return (
@@ -157,7 +162,7 @@ export const Dashboard = () => {
                         rel="noopener noreferrer"
                         className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 inline-flex items-center mt-1"
                       >
-                        <span>{site.name}.localhost:8082</span>
+                        <span>{site.name}.{baseDomain}</span>
                         <ExternalLink className="h-3 w-3 ml-1" />
                       </a>
                     </div>
